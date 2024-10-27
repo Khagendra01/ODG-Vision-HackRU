@@ -82,7 +82,7 @@ sequence = []
 sentence = []
 predictions = []
 threshold = 0.8  # Confidence threshold
-sequence_length = 30  # Same as used during training
+sequence_length = 10  # Same as used during training
 
 # 6. Start webcam feed
 cap = cv2.VideoCapture(0)  # Change index if necessary
