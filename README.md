@@ -1,0 +1,13 @@
+action = np.array(['about', 'after', 'again', 'all', 'animal', 'ask', 'baby', 'back',
+       'bad', 'because', 'bed', 'before', 'big', 'book', 'boy', 'bring',
+       'brother', 'buy', 'call', 'can', 'car', 'chair', 'child', 'city',
+       'clothes', 'come', 'computer', 'day', 'dog', 'drink', 'eat',
+       'family', 'father', 'find', 'first', 'friend', 'get', 'give', 'go',
+       'good', 'happy', 'have', 'help', 'her', 'home', 'hot', 'how',
+       'know', 'late', 'leave', 'like', 'make', 'man', 'many', 'me',
+       'mother', 'name', 'need', 'new', 'no', 'now', 'on', 'one', 'out',
+       'people', 'play', 'please', 'read', 'right', 'run', 'say',
+       'school', 'see', 'she', 'sit', 'sleep', 'small', 'sorry', 'stop',
+       'study', 'take', 'thank you', 'think', 'time', 'today', 'tomorrow',
+       'want', 'watch', 'we', 'what', 'when', 'where', 'who', 'why',
+       'work', 'yes', 'you'], dtype='<U9')
