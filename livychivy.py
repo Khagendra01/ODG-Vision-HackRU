@@ -82,7 +82,7 @@ sequence = []
 sentence = []
 predictions = []
 threshold = 0.5  # Adjust as needed
-
+sequence_length = 10
 # Start webcam feed
 cap = cv2.VideoCapture(0)
 
