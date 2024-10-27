@@ -5,6 +5,13 @@ import speech_recognition as sr
 import pyttsx3
 from picamera2 import Picamera2
 import time
+from pymongo import MongoClient
+from bson.binary import Binary
+
+# Connect to MongoDB Atlas
+client = MongoClient("mongodb+srv://<username>:<password>@<cluster-url>/test?retryWrites=true&w=majority")
+db = client["face_recognition"]
+collection = db["user_data"]
 
 # Initialize text-to-speech engine
 engine = pyttsx3.init()
@@ -35,20 +42,14 @@ def get_input_from_voice(prompt_text):
         return None
 
 def get_next_id():
-    if not os.path.exists('names.txt'):
+    user = collection.find().sort("_id", -1).limit(1)
+    if user.count() == 0:
         return 1
     else:
-        with open('names.txt', 'r') as f:
-            lines = f.readlines()
-            if not lines:
-                return 1
-            else:
-                ids = [int(line.split(',')[0]) for line in lines]
-                return max(ids) + 1
+        return user[0]["_id"] + 1
 
 def save_name_and_phone(name, phone, id):
-    with open('names.txt', 'a') as f:
-        f.write(f"{id},{name},{phone}\n")
+    collection.insert_one({"_id": id, "name": name, "phone": phone, "images": []})
 
 def capture_images(name, id):
     picam2 = Picamera2()
@@ -88,19 +89,18 @@ def capture_images(name, id):
         # Save images for each detected face (frontal and profile)
         for (x, y, w, h) in frontal_faces:
             sampleNum += 1
-            cv2.imwrite(f"dataset/User.{id}.{sampleNum}.jpg", gray[y:y + h, x:x + w])
-            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            face_image = gray[y:y + h, x:x + w]
+            save_image_to_db(id, face_image)
 
         for (x, y, w, h) in profile_faces:
             sampleNum += 1
-            cv2.imwrite(f"dataset/User.{id}.{sampleNum}.jpg", gray[y:y + h, x:x + w])
-            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            face_image = gray[y:y + h, x:x + w]
+            save_image_to_db(id, face_image)
 
         for (x, y, w, h) in right_profile_faces:
             sampleNum += 1
             flipped_face = flipped_img[y:y + h, x:x + w]
-            cv2.imwrite(f"dataset/User.{id}.{sampleNum}.jpg", cv2.flip(flipped_face, 1))
-            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            save_image_to_db(id, cv2.flip(flipped_face, 1))
 
         # Display the image
         cv2.imshow('Capturing Images', img)
@@ -116,29 +116,30 @@ def capture_images(name, id):
     picam2.stop()
     cv2.destroyAllWindows()
 
-def get_images_and_labels(path):
-    image_paths = [os.path.join(path, f) for f in os.listdir(path)]
+def save_image_to_db(user_id, face_image):
+    _, image_encoded = cv2.imencode('.jpg', face_image)
+    binary_image = Binary(image_encoded.tobytes())
+    collection.update_one({"_id": user_id}, {"$push": {"images": binary_image}})
+
+def get_images_and_labels():
+    users = collection.find({})
     face_samples = []
     ids = []
-    for imagePath in image_paths:
-        img_numpy = cv2.imread(imagePath, cv2.IMREAD_GRAYSCALE)
-        if img_numpy is None:
-            continue
-        id = int(os.path.split(imagePath)[-1].split(".")[1])
-        faces = face_cascade.detectMultiScale(img_numpy)
-        for (x, y, w, h) in faces:
-            face_samples.append(img_numpy[y:y + h, x:x + w])
+    for user in users:
+        id = user["_id"]
+        for image_data in user["images"]:
+            image_array = np.frombuffer(image_data, np.uint8)
+            face_image = cv2.imdecode(image_array, cv2.IMREAD_GRAYSCALE)
+            face_samples.append(face_image)
             ids.append(id)
     return face_samples, ids
 
 def train_recognizer():
-    faces, ids = get_images_and_labels('dataset')
+    faces, ids = get_images_and_labels()
     recognizer.train(faces, np.array(ids))
     recognizer.write('trainer/trainer.yml')
 
 if __name__ == '__main__':
-    if not os.path.exists('dataset'):
-        os.makedirs('dataset')
     if not os.path.exists('trainer'):
         os.makedirs('trainer')
         
