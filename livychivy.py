@@ -77,17 +77,15 @@ def extract_keypoints(results):
                    results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks and results.right_hand_landmarks.landmark else np.zeros(21*3)
     return np.concatenate([pose, face, lh, rh])
 
-# 5. Initialize variables
+# Initialize variables
 sequence = []
 sentence = []
 predictions = []
-threshold = 0.8  # Confidence threshold
-sequence_length = 10  # Same as used during training
+threshold = 0.5  # Adjust as needed
 
-# 6. Start webcam feed
-cap = cv2.VideoCapture(0)  # Change index if necessary
+# Start webcam feed
+cap = cv2.VideoCapture(0)
 
-# Set mediapipe model
 with mp_holistic.Holistic(min_detection_confidence=0.5, 
                           min_tracking_confidence=0.5) as holistic:
     while cap.isOpened():
@@ -98,55 +96,52 @@ with mp_holistic.Holistic(min_detection_confidence=0.5,
 
         # Make detections
         image, results = mediapipe_detection(frame, holistic)
-        
-        # Draw landmarks
         draw_styled_landmarks(image, results)
-        
+
         # Extract keypoints
         keypoints = extract_keypoints(results)
-        
-        # Append keypoints to the sequence
         sequence.append(keypoints)
-        sequence = sequence[-sequence_length:]  # Keep only the last 'sequence_length' elements
-        
-        # Perform prediction if we have enough keypoints
+        sequence = sequence[-sequence_length:]
+
         if len(sequence) == sequence_length:
             # Prepare input data
             input_data = np.expand_dims(sequence, axis=0)
-            
+
             # Get prediction
             res = model.predict(input_data)[0]
-            
-            # Get the action with the highest probability
-            predicted_action = actions[np.argmax(res)]
-            
-            # Check if the prediction confidence is above the threshold
-            if res[np.argmax(res)] > threshold:
+            predictions.append(res)
+
+            # Keep only recent predictions
+            if len(predictions) > 10:
+                predictions = predictions[-10:]
+
+            # Calculate average prediction
+            avg_res = np.mean(predictions, axis=0)
+            if np.max(avg_res) > threshold:
+                predicted_action = actions[np.argmax(avg_res)]
+
+                # Update sentence
                 if len(sentence) > 0:
                     if predicted_action != sentence[-1]:
                         sentence.append(predicted_action)
                 else:
                     sentence.append(predicted_action)
-            
-            # Limit the length of the displayed sentence
-            if len(sentence) > 5:
-                sentence = sentence[-5:]
-            
-            # Append prediction to predictions list
-            predictions.append(np.argmax(res))
-        
-        # Display the predictions on the image
+
+                # Limit sentence length
+                if len(sentence) > 5:
+                    sentence = sentence[-5:]
+
+        # Display predictions
         cv2.rectangle(image, (0,0), (640, 40), (245, 117, 16), -1)
         cv2.putText(image, ' '.join(sentence), (3,30), 
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-        
-        # Show the image
+
+        # Show image
         cv2.imshow('OpenCV Feed', image)
 
-        # Break gracefully
+        # Break on 'q' key
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
 
-# 8. Release resources
 cap.release()
 cv2.destroyAllWindows()
